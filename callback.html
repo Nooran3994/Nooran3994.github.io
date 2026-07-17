@@ -3,76 +3,141 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Deriv Auth - Token Captured</title>
+<title>Deriv Auth - Authorization Code</title>
 <style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
     background: #1a1a2e;
     color: #eee;
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
+    min-height: 100vh;
     margin: 0;
+    padding: 1rem;
   }
   .card {
     background: #16213e;
     padding: 2rem;
     border-radius: 12px;
     text-align: center;
-    max-width: 500px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    max-width: 540px;
+    width: 100%;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
   }
-  h2 { color: #00d4aa; margin-top: 0; }
-  .token-box {
+  h2 { color: #00d4aa; margin: 0.5rem 0; font-size: 1.3rem; }
+  .success { color: #00d4aa; font-size: 1.1rem; margin-bottom: 0.25rem; }
+  .code-box {
     background: #0f3460;
     color: #00d4aa;
     padding: 1rem;
     border-radius: 8px;
     word-break: break-all;
-    font-family: monospace;
-    font-size: 14px;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 13px;
     margin: 1rem 0;
     border: 1px solid #00d4aa44;
     user-select: all;
     cursor: pointer;
+    line-height: 1.5;
+    text-align: left;
+    max-height: 160px;
+    overflow-y: auto;
   }
-  .token-box:hover { border-color: #00d4aa; }
-  .hint { color: #888; font-size: 13px; margin-top: 1rem; }
-  .success { color: #00d4aa; font-size: 1.2rem; margin-bottom: 0.5rem; }
-  .error { color: #e74c3c; }
+  .code-box:hover { border-color: #00d4aa; }
+  .hint { color: #aab; font-size: 13px; margin-top: 0.75rem; line-height: 1.6; }
+  .hint strong { color: #ddd; }
+  .step { color: #889; font-size: 12px; margin-top: 1.25rem; padding: 0.75rem; background: #0f1a30; border-radius: 8px; text-align: left; line-height: 1.7; }
+  .step span { color: #00d4aa; font-weight: bold; }
+  .error { color: #ff6b6b; }
+  .no-code { color: #ffa500; }
+  hr { border: 0; border-top: 1px solid #ffffff11; margin: 1rem 0; }
 </style>
 </head>
 <body>
 <div class="card">
-  <div class="success">✓ Token Captured</div>
-  <h2>Copy Your Deriv Token</h2>
-  <p id="token-display" class="token-box">No token found in URL</p>
-  <p class="hint">⬆ Click the token above to select all, then press <strong>Ctrl+C</strong> (Windows) or <strong>Cmd+C</strong> (Mac) to copy.</p>
-  <p class="hint">Paste it into the <strong>Token</strong> field in your trading system and click <strong>CONNECT</strong>.</p>
-  <p class="hint">If you see "No token found" above, try: <strong>Settings → API Tokens → copy token directly</strong> and paste into the trading system instead.</p>
+  <div id="status-icon">⚡</div>
+  <h2>Deriv Authorization</h2>
+  <div id="status-text">Processing...</div>
+  <div id="code-display" class="code-box">Waiting for authorization code...</div>
+  <div id="instructions" class="hint"></div>
+  <hr>
+  <div class="step">
+    <span>➊</span> Copy the code above (Ctrl+C / Cmd+C)<br>
+    <span>➋</span> Go back to your trading system<br>
+    <span>➌</span> Paste into the <strong>Authorization Code</strong> field<br>
+    <span>➍</span> Click <strong>EXCHANGE</strong>
+  </div>
+  <div class="hint" style="margin-top:1rem;font-size:11px;color:#667;">
+    Once exchanged, the system will fetch your accounts and connect automatically.
+  </div>
 </div>
 
 <script>
 (function() {
-  const hash = location.hash.substring(1);
-  const params = new URLSearchParams(hash);
-  const token = params.get('token1');
-  const display = document.getElementById('token-display');
+  const display = document.getElementById('code-display');
+  const statusText = document.getElementById('status-text');
+  const statusIcon = document.getElementById('status-icon');
+  const instructions = document.getElementById('instructions');
 
-  if (token) {
-    display.textContent = token;
-    display.className = 'token-box';
-    display.addEventListener('click', function() {
-      const range = document.createRange();
-      range.selectNodeContents(this);
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
-    });
+  // Try query string first (PKCE OAuth2 flow: ?code=xxx)
+  const query = location.search.substring(1);
+  const queryParams = new URLSearchParams(query);
+  const codeFromQuery = queryParams.get('code');
+  const stateFromQuery = queryParams.get('state');
+
+  // Try hash fragment (legacy OAuth flow: #token1=xxx)
+  const hash = location.hash.substring(1);
+  const hashParams = new URLSearchParams(hash);
+  const tokenFromHash = hashParams.get('token1');
+
+  // Also try just the raw hash body in case it's a bare token
+  const rawHashToken = hash && !hash.includes('=') ? hash : null;
+
+  if (codeFromQuery) {
+    // PKCE flow - this is what we're using
+    statusIcon.textContent = '✅';
+    statusText.textContent = '✓ Authorization Code Captured';
+    statusText.className = 'success';
+    display.textContent = codeFromQuery;
+    display.className = 'code-box';
+    instructions.innerHTML = '⬆ <strong>Click the code above</strong> to select all, then press <strong>Ctrl+C</strong> (Windows) or <strong>Cmd+C</strong> (Mac) to copy.';
+  } else if (tokenFromHash) {
+    // Legacy token1 flow
+    statusIcon.textContent = '✅';
+    statusText.textContent = '✓ Token Captured (Legacy)';
+    statusText.className = 'success';
+    display.textContent = tokenFromHash;
+    display.className = 'code-box';
+    instructions.innerHTML = 'This is a <strong>legacy token</strong>. Copy it and paste into the trading system\'s <strong>Token</strong> field.';
+  } else if (rawHashToken) {
+    // Raw hash token
+    statusIcon.textContent = '✅';
+    statusText.textContent = '✓ Token Found';
+    statusText.className = 'success';
+    display.textContent = rawHashToken;
+    display.className = 'code-box';
+    instructions.innerHTML = 'Copy this token and paste into the trading system\'s <strong>Token</strong> field.';
   } else {
-    display.className = 'token-box error';
+    // No code or token found - show raw URL for debugging
+    const fullURL = location.href;
+    statusIcon.textContent = '⚠️';
+    statusText.textContent = 'No code found in URL';
+    statusText.className = 'no-code';
+    display.textContent = fullURL;
+    display.className = 'code-box no-code';
+    instructions.innerHTML = 'No authorization code was returned. If you arrived here from Deriv after authorizing, <strong>copy the entire URL above</strong> and paste it into the trading system\'s <strong>Callback URL</strong> field. The system will extract the code automatically.';
   }
+
+  // Auto-select on click
+  display.addEventListener('click', function() {
+    const range = document.createRange();
+    range.selectNodeContents(this);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  });
 })();
 </script>
 </body>
