@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deriv Auth - Token Captured</title>
+<style>
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    background: #1a1a2e;
+    color: #eee;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+  }
+  .card {
+    background: #16213e;
+    padding: 2rem;
+    border-radius: 12px;
+    text-align: center;
+    max-width: 500px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+  h2 { color: #00d4aa; margin-top: 0; }
+  .token-box {
+    background: #0f3460;
+    color: #00d4aa;
+    padding: 1rem;
+    border-radius: 8px;
+    word-break: break-all;
+    font-family: monospace;
+    font-size: 14px;
+    margin: 1rem 0;
+    border: 1px solid #00d4aa44;
+    user-select: all;
+    cursor: pointer;
+  }
+  .token-box:hover { border-color: #00d4aa; }
+  .hint { color: #888; font-size: 13px; margin-top: 1rem; }
+  .success { color: #00d4aa; font-size: 1.2rem; margin-bottom: 0.5rem; }
+  .error { color: #e74c3c; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="success">✓ Token Captured</div>
+  <h2>Copy Your Deriv Token</h2>
+  <p id="token-display" class="token-box">No token found in URL</p>
+  <p class="hint">⬆ Click the token above to select all, then press <strong>Ctrl+C</strong> (Windows) or <strong>Cmd+C</strong> (Mac) to copy.</p>
+  <p class="hint">Paste it into the <strong>Token</strong> field in your trading system and click <strong>CONNECT</strong>.</p>
+  <p class="hint">If you see "No token found" above, try: <strong>Settings → API Tokens → copy token directly</strong> and paste into the trading system instead.</p>
+</div>
+
+<script>
+(function() {
+  const hash = location.hash.substring(1);
+  const params = new URLSearchParams(hash);
+  const token = params.get('token1');
+  const display = document.getElementById('token-display');
+
+  if (token) {
+    display.textContent = token;
+    display.className = 'token-box';
+    display.addEventListener('click', function() {
+      const range = document.createRange();
+      range.selectNodeContents(this);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    });
+  } else {
+    display.className = 'token-box error';
+  }
+})();
+</script>
+</body>
+</html>
